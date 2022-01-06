@@ -84,3 +84,25 @@ changed: [192.168.0.17]
 PLAY RECAP *************************************************************************************************************
 192.168.0.17               : ok=16   changed=4    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
 
+```
+
+
+## What's next
+
+Export VAULT_ADDR appropriately and turn off TLS verification(self-signed cert)
+```
+export VAULT_ADDR=https://pi:8200
+export VAULT_SKIP_VERIFY=1
+
+```$ vault status
+Key                Value
+---                -----
+Seal Type          shamir
+Initialized        false
+Sealed             true
+Total Shares       0
+Threshold          0
+Unseal Progress    0/0
+Unseal Nonce       n/a
+Version            1.9.2
+HA Enabled         false
