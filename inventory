@@ -1,0 +1,4 @@
+[vaults]
+192.168.0.17
+[vaults:vars]
+ansible_ssh_user=pasko

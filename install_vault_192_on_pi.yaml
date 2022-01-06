@@ -1,0 +1,131 @@
+- hosts: vaults
+  become: yes
+  order: sorted
+  gather_facts: False
+  strategy: linear
+  serial: 1
+
+  vars:
+    vault_vers: 1.9.2
+    vault_svc: /lib/systemd/system/vault.service
+    config_dir: config
+
+  tasks:
+    - name: "Add vault group"
+      ansible.builtin.group:
+        name: vault
+        state: present
+        system: False
+
+    - name: "Add vault user"
+      ansible.builtin.user:
+        name: vault
+        comment: "Vault user"
+        groups: vault
+
+    - name: "Create vault directory"
+      file:
+        path: /opt/vault/{{ vault_vers }}
+        owner: root
+        group: root
+        mode: 0755
+        state: directory
+
+    - name: "Create vault data directory"
+      file:
+        path: /var/vault-data
+        owner: vault
+        group: vault
+        mode: 0700
+        state: directory
+
+    - name: "Create vault config directory"
+      file:
+        path: /etc/vault
+        owner: vault
+        group: vault
+        mode: 0700
+        state: directory
+
+    - name: "See if we already downloaded vault"
+      stat:
+        path: "/opt/vault/{{ vault_vers }}/vault"
+      register: vault_exists
+
+    - name: "Download vault"
+      get_url:
+        url:  https://releases.hashicorp.com/vault/{{ vault_vers }}/vault_{{ vault_vers }}_linux_arm.zip
+        dest: /opt/vault/{{ vault_vers }}/vault.zip
+        mode: 0444
+      when: not vault_exists.stat.exists
+
+    - name: "Unpack Vault zip file"
+      unarchive:
+        src:  /opt/vault/{{ vault_vers }}/vault.zip
+        dest: /opt/vault/{{ vault_vers }}/
+        remote_src: yes
+      when: not vault_exists.stat.exists
+
+    - name: "Chown vault binary to vault"
+      file:
+        path:  /opt/vault/{{ vault_vers }}/vault
+        owner: vault
+        group: vault
+        mode: 0755
+        state: file
+
+    - name: "symlink vault"
+      file:
+        src: "/opt/vault/{{ vault_vers }}/vault"
+        dest: "/usr/local/bin/vault"
+        state: link
+
+    - name: "Copy vault config to host"
+      copy:
+        src: "{{config_dir}}/vault.hcl"
+        dest: "/etc/vault.hcl"
+        mode: 0640
+        owner: vault
+        group: vault
+
+    - name: "Copy ssl keyto host"
+      copy:
+        src: "{{config_dir}}/domain.key"
+        dest: "/etc/vault/domain.key"
+        mode: 0600
+        owner: vault
+        group: vault
+
+    - name: "Copy ssl crt to host"
+      copy:
+        src: "{{config_dir}}/domain.crt"
+        dest: "/etc/vault/domain.crt"
+        mode: 0600
+        owner: vault
+        group: vault
+
+    - name: "Copy vault systemd config to host"
+      copy:
+        src: "{{config_dir}}/vault.service"
+        dest: "{{vault_svc}}"
+        mode: 0640
+        owner: root
+        group: root
+
+    - name: "Symlink systemd vault config"
+      file:
+        src: "{{vault_svc}}"
+        dest: "/etc/systemd/system/vault.service"
+        state: link
+
+    - name: "Reload systemd"
+      command: systemctl daemon-reload
+      ignore_errors: yes
+
+    - name: "Enable systemd"
+      command: systemctl enable vault.service
+      ignore_errors: yes
+
+    - name: "Start systemd"
+      command: systemctl start vault.service
+      ignore_errors: yes
